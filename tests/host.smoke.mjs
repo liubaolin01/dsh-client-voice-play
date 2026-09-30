@@ -326,24 +326,39 @@ const DIAG_PATH = '/voice-play/diag'
   })
 }
 
-// 6) 真实合成：中文 → WAV。
+// 6) 真实合成：中文 → 本机 WAV 或（本机没有中文音色时）在线 MP3。
+//    GitHub 的英文 runner 上只有 David/Mark/Zira 三个英文音色，本机合成必然产不出中文，
+//    此时按设计会退到在线神经语音 —— 所以这里断言的是「拿到一段与 content-type 相符的真音频」，
+//    而不是死认 WAV。
 {
   const { routes } = await activateHost()
   const text = '你好，这是一段朗读测试。语音播放插件正在工作。'
   const res = await call(routes, SPEAK_PATH, makePost({ text, rate: 1, volume: 1 }))
-  await check('speak 返回 audio/wav', () => {
+  const contentType = String(res.headers['content-type'])
+  const isWav = contentType === 'audio/wav'
+  await check('speak 返回可播放音频（本机 WAV 或在线 MP3）', () => {
     assert.equal(res.statusCode, 200, `status=${res.statusCode} body=${res.body.toString('utf8').slice(0, 300)}`)
-    assert.equal(res.headers['content-type'], 'audio/wav')
-    assert.ok(res.body.length > 1000, `WAV 太小：${res.body.length} 字节`)
+    assert.ok(['audio/wav', 'audio/mpeg'].includes(contentType), `content-type 异常：${contentType}`)
+    assert.ok(res.body.length > 1000, `音频太小：${res.body.length} 字节`)
+    checks.push(`       （${contentType} / ${res.body.length} 字节）`)
   })
-  await check('WAV 头合法且含真实音频数据', () => {
-    const wav = parseWav(res.body)
-    assert.ok(wav.sampleRate >= 8000, `采样率异常：${wav.sampleRate}`)
-    assert.ok(wav.channels >= 1)
-    assert.ok(wav.dataBytes > 8000, `音频数据太少：${wav.dataBytes} 字节`)
-    const seconds = wav.dataBytes / (wav.sampleRate * wav.channels * (wav.bitsPerSample / 8))
-    checks.push(`       （合成 ${text.length} 字 → ${res.body.length} 字节 / 约 ${seconds.toFixed(2)} 秒，${wav.sampleRate}Hz）`)
-    assert.ok(seconds > 1, `时长异常：${seconds.toFixed(2)} 秒`)
+  await check('音频容器与 content-type 相符且含真实数据', () => {
+    if (isWav) {
+      const wav = parseWav(res.body)
+      assert.ok(wav.sampleRate >= 8000, `采样率异常：${wav.sampleRate}`)
+      assert.ok(wav.channels >= 1)
+      assert.ok(wav.dataBytes > 8000, `音频数据太少：${wav.dataBytes} 字节`)
+      const seconds = wav.dataBytes / (wav.sampleRate * wav.channels * (wav.bitsPerSample / 8))
+      checks.push(`       （合成 ${text.length} 字 → 约 ${seconds.toFixed(2)} 秒，${wav.sampleRate}Hz）`)
+      assert.ok(seconds > 1, `时长异常：${seconds.toFixed(2)} 秒`)
+      return
+    }
+    // MP3：要么带 ID3 头，要么是 0xFFEx / 0xFFFx 帧同步
+    const head = res.body.subarray(0, 3)
+    const isId3 = head.toString('latin1') === 'ID3'
+    const isFrame = res.body[0] === 0xff && (res.body[1] & 0xe0) === 0xe0
+    assert.ok(isId3 || isFrame, `不是可识别的 MP3：${res.body.subarray(0, 4).toString('hex')}`)
+    assert.ok(res.body.length > 3000, `MP3 太小：${res.body.length} 字节`)
   })
   await check('指定音色可用', async () => {
     const voicesRes = await call(routes, VOICES_PATH, makeGet())
@@ -352,12 +367,17 @@ const DIAG_PATH = '/voice-play/diag'
     assert.equal(named.statusCode, 200, `status=${named.statusCode}`)
     assert.ok(named.body.length > 1000)
   })
-  await check('OneCore 男声（winrt 后端）能合成', async () => {
+  await check('OneCore 中文男声（winrt 后端）能合成（本机没有该音色时跳过）', async () => {
     const voicesRes = await call(routes, VOICES_PATH, makeGet())
     const male = JSON.parse(voicesRes.body.toString('utf8')).voices.find((v) => v.backend === 'winrt' && v.gender === 'Male' && /^zh/i.test(v.culture || ''))
-    assert.ok(male, '本机没有 OneCore 中文男声')
+    if (!male) {
+      // 英文 Windows（如 CI runner）没有中文 OneCore 音色，这不是插件的问题。
+      checks.push('       （本机没有 OneCore 中文男声，跳过这条）')
+      return
+    }
     const res2 = await call(routes, SPEAK_PATH, makePost({ text: '这是男声康康的合成测试。', voiceName: male.name, rate: 1, volume: 1 }))
     assert.equal(res2.statusCode, 200, `status=${res2.statusCode} body=${res2.body.toString('utf8').slice(0, 200)}`)
+    assert.equal(res2.headers['content-type'], 'audio/wav', `指定本机音色时应出 WAV：${res2.headers['content-type']}`)
     parseWav(res2.body)
     assert.ok(res2.body.length > 10000, `WAV 太小：${res2.body.length}`)
   })
