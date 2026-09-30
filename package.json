@@ -1,0 +1,66 @@
+{
+  "name": "dsh-client-voice-play",
+  "description": "给 dsh 助手回复加一个朗读按钮，并可任务完成后自动播报：宿主侧用 Windows 系统语音或免费在线神经语音（330 音色），浏览器侧用 Web Speech API 兜底。",
+  "version": "0.2.5",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/edge-tts.js",
+    "lib/speak.ps1",
+    "install.ps1",
+    "uninstall.ps1",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "tts",
+    "text-to-speech",
+    "speech-synthesis",
+    "read-aloud",
+    "voice",
+    "chinese-tts"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liubaolin01/dsh-client-voice-play.git"
+  },
+  "homepage": "https://github.com/liubaolin01/dsh-client-voice-play#readme",
+  "bugs": {
+    "url": "https://github.com/liubaolin01/dsh-client-voice-play/issues"
+  },
+  "scripts": {
+    "test": "node tests/client.smoke.mjs && node tests/host.smoke.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    # 宿主半端要真跑 PowerShell 合成 WAV，所以必须 Windows。
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 客户端半端（桩 React + 真 React 渲染 / 播放状态机 / 自动播报 / 跨平台引擎选择）
+        run: node tests/client.smoke.mjs
+      - name: 宿主半端（路由契约 + 真合成 WAV + 在线神经语音 + cordis 语义回归）
+        run: node tests/host.smoke.mjs

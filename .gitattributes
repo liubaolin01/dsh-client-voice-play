@@ -1,0 +1,10 @@
+# 换行符显式钉住：PowerShell 脚本用 CRLF，其余用 LF。
+# 不写这条的话，core.autocrlf=true 的机器上克隆出来会是另一套换行符。
+* text=auto
+*.ps1 text eol=crlf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.gitignore text eol=lf
